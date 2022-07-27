@@ -137,7 +137,11 @@ Function check clipboard content, and then prints OMIT commands which should be 
 3) Copy and paste OMIT commands to INS file.
 
 Examples: 
+
 OMITME(0.014)       - will omit Fo^2 > Fc^2 below Fc/Fc(max) = 0.014
+
 OMITME(0.032,0.014) - will omit Fo^2 > Fc^2 in (0.014-0.032) range
+
 OMITME(0.032,0.014,rule='low') - will omit Fo^2 < Fc^2 in (0.014-0.032) range
+
 OMITME(0,r='Error',error=10)   - will omit reflections with error > 10
