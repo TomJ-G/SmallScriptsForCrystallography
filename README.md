@@ -68,6 +68,18 @@ Let's say that we want to plot a, b, c and V in dependence of increasing tempera
     results = SearchInCif(root_path,searched)
     DF = MakeDF(results,searched,index)
 
+Lets take a look on the Data Frame for a moment. There are some extra columns beside a, b, c and V.
+The function is also extracting error values and puts them to separate columns. Of course, because I used faked data, here errors are the same for each temperature.
+If value has no error, then it will be set to 0. Also, index value is not checked for error!
+
+|_cell_measurement_temperature|_cell_length_a|_cell_length_b|_cell_length_c|_cell_volume|_cell_length_a_error|_cell_length_b_error|_cell_length_c_error|_cell_volume_error|
+|-----------------------------|--------------|--------------|--------------|------------|---------------------|---------------------|---------------------|------------------|
+|300.0|3.00|10.0|12.0|360.0000|0.19|0.02|0.06|0.0500|
+|358.0|	3.10|	10.3|	12.5|	399.1250|	0.19|	0.02|	0.06|	0.0050|
+|373.0|	3.12|	10.4|	12.7|	412.0896|	0.19|	0.02|	0.06|	0.0005|
+|398.0|	3.13|	10.5|	13.1|	430.5315|	0.19|	0.02|	0.06|	0.0005|
+|418.0|	3.14|	10.6|	13.3|	442.6772|	0.19|	0.02|	0.06|	0.0005|
+
 Now plotting can be performed. There are several ways of plotting within plotSplit function. Also there are some ways to customize the plot. We want to set labels for all axes, add units. First we want to see four separate plots in one figure. We do this by setting composition to "auto" (or "a"), or ignoring composition parameter (because "auto" is default behaviour).
 
     xlabel = "TEMP"
@@ -77,6 +89,8 @@ Now plotting can be performed. There are several ways of plotting within plotSpl
 
 The result:
 ![image](https://user-images.githubusercontent.com/59794882/181144518-464f4401-8666-464f-9bdd-36a6a4c2c7de.png)
+
+To add error bars, just add parameter **error_bars = True**
 
 In some cases it is better to show such unit cell parameters change on one plot. In this case, different color will be assigned to each plot by us, and all data will be normalized to the initial one. **At the current version, labels and units must be specified for all subplots, despite x and y axis are shared.**
 
@@ -89,3 +103,41 @@ The result:
 
 ![image](https://user-images.githubusercontent.com/59794882/181145662-08106bcc-27bb-4d95-a3aa-e88ffde82ac9.png)
 
+It is possible to also make plot as rows or columns by changing composition to (respectively) "rows" or "r" and "columns" or "c".
+
+The plotting function will work with any DataFrame, not only the one created by MakeDF as long as it is properly formatted! The default way to format your DF for this function is to set first parameter columns and then error columns (just like in the table above). Then, just use correct column headers for "columns" parameter.
+
+### Plots sharing only X axis
+
+In the previous example it was possible to plot multiple data on single graph with "single" composition. Yet, this type of plot forces to share X and Y axis. The **TwoAxPlot** function purpose is to plot two datasets with shared X but separate Y axes.
+In essence, as an input DataFrame, List or array can be used. In this example I'll use the same DataFrame as in the previous one (made with SearchInCif + MakeDF functions). 
+By default, function will plot index value as X, and column 1 and column 2 as Y1 and Y2. To modify it, **"select"** parameter need to be altered.
+This function can be also used to create subplots - just supply it with axis object:
+
+    fig, axs = plt.subplots(nrows = 1, ncols = 2,figsize=(20,6))
+    plt.subplots_adjust(wspace=0.3)
+    TwoAxPlot(DF,ax=axs[0],ylabels=['a','b']) #No "select" is used which is equivalent to select = [0,1,2]
+    TwoAxPlot(DF,select=[0,3,4],ax=axs[1],ylabels=['c','V'])
+
+The result:
+
+![image](https://user-images.githubusercontent.com/59794882/181167423-34fa78f8-1f8e-4f0e-8243-4b5d44a707a9.png)
+
+
+## Other functions
+
+### Bad reflection ommiting
+This function is helpful if multiple bad reflections need to be omited from *shelxl* *.lst file. There are three modes of omitting available: when Fo^2 > Fc^2, when Fo^2 < Fc^2, and when error/est is above threshold.
+Two first modes require to specify the range of fcf at which omitting should be done. Third mode, do not care about range, only about error/est threshold.
+Function check clipboard content, and then prints OMIT commands which should be added to INS file.
+
+**How to use it?**
+1) Copy *"Most Disagreeable Reflections"* table from *.lst file to clipboard
+2) Execute function
+3) Copy and paste OMIT commands to INS file.
+
+Examples: 
+OMITME(0.014)       - will omit Fo^2 > Fc^2 below Fc/Fc(max) = 0.014
+OMITME(0.032,0.014) - will omit Fo^2 > Fc^2 in (0.014-0.032) range
+OMITME(0.032,0.014,rule='low') - will omit Fo^2 < Fc^2 in (0.014-0.032) range
+OMITME(0,r='Error',error=10)   - will omit reflections with error > 10
