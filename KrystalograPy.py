@@ -339,7 +339,6 @@ def SearchInCif(path,columns):
     from pathlib import Path
 
     
-    #current_directory = r'C:\Users\sms\Desktop\Structures\Omoto\C22_2\CIF'
     Read_folder = Path(path).glob('*.cif')
     files = [x for x in Read_folder]
     
@@ -622,7 +621,8 @@ def TwoAxPlot(Data,colors=['r','b'],markers=["o","s"],
             
             
 def fcfoplot(Pth,LowerLimit,UpperLimit,log=True,
-             colortable=['r','b','g','orange','m','c','k','purple','pink']):
+             colortable=['r','b','g','orange','magenta','cyan','black','purple','pink'],
+              axis=None):
    
     '''
     This function plots Fo-Fc graph from fcf or csv file.
@@ -630,23 +630,22 @@ def fcfoplot(Pth,LowerLimit,UpperLimit,log=True,
     You can supply one path as list for single plot, or several paths in list file, for multiple overlaid graphs.
     The csv is expected to be in the same format as one produced by Olex2 and fcf should be SHELX style.
     Paths to csv and fcf can be mixed!
-    
-    :param Pth: list, One or more paths to fcf or csv files AS A LIST!
-    :param LowerLimit: float, Minimal value of Fo/Fc to be plotted,
-    :param UpperLimit: float, Maximal value of Fo/Fc to be plotted,
-    :param log: bool, default = True. Change to False fore linear scale,
-    :param colortable: list, change to override colors used for plotting. 
-                       By default table contains 9 colours:
-                       red, blue, orange, magenta, cyan, black, purple, pink
-    :examples:    
+        INPUT:
+            Pth - one or more paths to fcf or csv files AS A LIST!
+            LowerLimit - minimal value of Fo/Fc to be plotted,
+            UpperLimit - maximal value of Fo/Fc to be plotted,
+            log - by default set to True. Change to False to not plot logarithmic scale
+            colortable - you can override colors used for plotting. By default table contains 9 colours:
+                         red, blue, orange, magenta, cyan, black, purple, pink
+        EXAMPLES:
             Single plot:
-                FcFplot(['C:/1/FCF.csv'],0.01,200)
+                FcFplot(['C:/data/SomeFCF.csv'],0.01,200)
             Multiple plots:
-                        fcfoplot(['C:/1/FCF_1.csv','C:/1/FCF_2.fcf'],0.01,200)
+                        fcfoplot(['C:/data/SomeFCF_1.csv','C:/data/SomeFCF_2.fcf'],0.01,200)
             Changed color:
-                        fcfoplot([pth1,pth2],0.01,180,colortable=['g','r'])
+                        fcfoplot([paths],0.01,180,colortable=['green'])
             Different limits on each axis, logarithmic scale:
-                        fcfoplot([pth1,pth2],(0.5,0.5),40000,log=True)
+                        fcfoplot([paths],(0.5,0.5),40000,log=True)
     '''
 
     import re
@@ -677,18 +676,22 @@ def fcfoplot(Pth,LowerLimit,UpperLimit,log=True,
     elif type(UpperLimit) in (list,tuple):
         ULx = UpperLimit[0]
         ULy = UpperLimit[1]
-      
+    
     clist = colortable
-    f = plt.figure()
-    ax=plt.gca()
+
+    if axis == None:
+        ax=plt.gca()
+    else:
+        ax = axis
+        
     if log == True:
         ax.set_xscale('log')
         ax.set_yscale('log')
-    f.set_figwidth(6)
-    f.set_figheight(6)
-    plt.gca().set_aspect('auto', adjustable='box')
-    plt.xlim(LLx, ULx)
-    plt.ylim(LLy, ULy)
+    #f.set_figwidth(6)
+    #f.set_figheight(6)
+    ax.set_aspect('auto', adjustable='box')
+    ax.set_xlim(LLx, ULx)
+    ax.set_ylim(LLy, ULy)
     for p in Pth:
         
         m = re.match(ext,p)
@@ -706,15 +709,14 @@ def fcfoplot(Pth,LowerLimit,UpperLimit,log=True,
                             t1 = str(M[val]).strip()
                             temp.append(float(t1))
                         fcf.append(temp)
-            plt.scatter(np.array(fcf)[:,0],np.array(fcf)[:,1],c=clist[0],s=(4*72./150)**2) 
+            ax.scatter(np.array(fcf)[:,0],np.array(fcf)[:,1],c=clist[0],s=(5*72./150)**2) 
             clist = np.roll(clist,-1)
         elif m[1]=='.csv':
             DF = pd.read_csv(p)
-            plt.scatter(DF['x'],DF['y'],c=clist[0],s=(4*72./150)**2)
+            ax.scatter(DF['x'],DF['y'],c=clist[0],s=(4*72./150)**2)
             clist = np.roll(clist,-1)
-        plt.xlabel('Fc', fontsize=15)
-        plt.ylabel('Fo', fontsize=15)
-    plt.show()
+        ax.set_xlabel('Fc', fontsize=15)
+        ax.set_ylabel('Fo', fontsize=15)
     
     
 #=============================================================================#
