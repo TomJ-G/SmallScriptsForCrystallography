@@ -53,6 +53,8 @@ For plotting to be succesfull there are few things needed: (1) All CIF files sho
 **How to use it?**
 Let's say that we want to plot a, b, c and V in dependence of increasing temperature. First we need to perform search and create DataFrame object:
 
+*!All data on plots comes from "faked" data i.e. I used standard CIF files but changed a, b, c, V and Temp. values to false ones, not associated with any real published data!*
+
     from KrystalograPy import SearchInCif, MakeDF, plotSplit
     
     root_path = r"C:\cifdata\"
@@ -66,4 +68,24 @@ Let's say that we want to plot a, b, c and V in dependence of increasing tempera
     results = SearchInCif(root_path,searched)
     DF = MakeDF(results,searched,index)
 
-Now plotting can be performed. There are several ways of plotting within plotSplit function
+Now plotting can be performed. There are several ways of plotting within plotSplit function. Also there are some ways to customize the plot. We want to set labels for all axes, add units. First we want to see four separate plots in one figure. We do this by setting composition to "auto" (or "a"), or ignoring composition parameter (because "auto" is default behaviour).
+
+    xlabel = "TEMP"
+    ylabel = ['a','b','c','V']
+    units_all  = ["[K]","[$\AA$]","[$\AA$]","[$\AA$]","[$\AA^3$]"]
+    plotSplit(DF,searched,size=[10,6],x_label=xlabel,y_label=ylabel,units=units_all)
+
+The result:
+![image](https://user-images.githubusercontent.com/59794882/181144518-464f4401-8666-464f-9bdd-36a6a4c2c7de.png)
+
+In some cases it is better to show such unit cell parameters change on one plot. In this case, different color will be assigned to each plot by us, and all data will be normalized to the initial one. **At the current version, labels and units must be specified for all subplots, despite x and y axis are shared.**
+
+    colors    = ['r','g','b','k']
+    labels    = ["Change of unit cell","Change of unit cell","Change of unit cell","Change of unit cell"]
+    units_one = ['[K]','[%]','[%]','[%]','[%]']
+    plotSplit(DF,searched,composition='s',size=[10,8],x_label=xlabel,y_label=labels,units=units_one,color=colors,legend=True)
+    
+The result:
+
+![image](https://user-images.githubusercontent.com/59794882/181145662-08106bcc-27bb-4d95-a3aa-e88ffde82ac9.png)
+
