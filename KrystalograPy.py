@@ -15,6 +15,33 @@ VanDerWaals = {"H":[1.2,1], "Zn":[1.39,30], "He":[1.4,2], "Cu":[1.4,29],
                "Te":[2.06,52], "Si":[2.10,14], "Xe":[2.16,54], "Sn":[2.17,50], 
                "Na":[2.27,11], "K":[2.75,19], }
 
+def ArrayWIndex(Dataframe):
+    """
+    Parameters
+    ----------
+    Dataframe : pandas dataframe
+        Dataframe to be converted to array.
+
+    Returns
+    -------
+    new_array : numpy array
+        Array with index value included.
+
+    """
+    import pandas as pd
+    import numpy as np
+    
+    new_array = []
+    
+    Index = np.array(Dataframe.index)
+    Values = Dataframe.values
+    
+    for i in range(0,len(Values)):
+        new_array.append([Index[i],*Values[i]])
+        
+    new_array = np.array(new_array)
+    
+    return new_array
 
 def popsmall(data):
     """
@@ -267,7 +294,7 @@ def StructureCartesian(data,UnitCell):
     return CartesianAtoms
 
 
-def OMITME(maximal,minimal=0,r='high',error=10.0):
+def OMITME(maximal=999,minimal=0,r='high',error=10.0):
     
     """
     Prints OMIT command from the list of most disagreeable reflections.
@@ -509,13 +536,14 @@ def plotSplit(DF,columns,composition = "auto",color='b',size = [22,12],
     
     #Check length of query
     length = len(columns) - 1
-    unitsC = units.copy()
+    
     #if there are label values, add space to each
     if units == None:
         unitsC = []
         for i in range(0,len(columns)):
             unitsC.append("")
     else:
+        unitsC = units.copy()
         for i in range(0,len(columns)):
             unitsC[i] = " "+unitsC[i]
     
@@ -563,15 +591,19 @@ def plotSplit(DF,columns,composition = "auto",color='b',size = [22,12],
     
     return f
         
-def TwoAxPlot(Data,colors=['r','b'],markers=["o","s"],
+def TwoAxPlot(Data,colors=['r','b'],markers=["o","s"],select=[None,None,None],
               ylabels=None,xlabel=None,log=False,ax=None,Legend=None,box=None):
     """
     Two scatter plots on one figure, with shared x axis, but different y axes.
+    By default it uses three first columns of data as x, y1 and y2.
+    
     :param Data: array|list(list), Should consist of 3 columns (1st = index)
     :param colors: list(str)|tuple(str), Colors for markers of 1st, 2nd dataset
                    default: ['r','b']
     :param markers: list(str)|tuple(str), Markers shape,
                     default: ['o','s']
+    :param select: list, column number which should be used for x, y1 and y2.
+                    default: [0,1,2]
     :param ylabels: list(str)|tuple(str), Labels for 1st and 2nd y-axis
     :param xlabel: string, X-axis label
     :param log: bool, Set to True for logarithmic x-scale
@@ -594,19 +626,43 @@ def TwoAxPlot(Data,colors=['r','b'],markers=["o","s"],
     
     import matplotlib.pyplot as plt
     import numpy as np
+    from pandas.core.frame import DataFrame
     
-    if type(Data) != np.ndarray:
+    if ax == None:
+        ax=plt.gca()
+    
+    #Check data type. All except data frame translate to array.
+    #DataFrame is exception, because index is ommited with translation!
+    if type(Data) == DataFrame:
+        Data = ArrayWIndex(Data)
+    elif type(Data) != np.ndarray:
         Data = np.array(Data)
+    
+    #Data selection
+    if select[0] == None:
+        x_data = Data[:,0]
+    else:
+        x_data = Data[:,select[0]]
+    
+    if select[1] == None:
+        y1_data = Data[:,1]
+    else:
+        y1_data = Data[:,select[1]]
+    
+    if select[2] == None:
+        y2_data = Data[:,2]
+    else:
+        y2_data = Data[:,select[2]]
     
     if xlabel != None:
         ax.set_xlabel(xlabel)
-    pl1 = ax.scatter(x = Data[:,0],y = Data[:,1],c=colors[0],marker=markers[0],label=ylabels[0])
+    pl1 = ax.scatter(x = x_data, y=y1_data, c=colors[0], marker=markers[0])
 
     if ylabels != None:
         ax.set_ylabel(ylabels[0])
         ax.yaxis.label.set_color(colors[0])
     ax2 = ax.twinx()
-    pl2 = ax2.scatter(x = Data[:,0],y = Data[:,2],c=colors[1],marker=markers[1],label=ylabels[1])
+    pl2 = ax2.scatter(x = x_data,y = y2_data,c=colors[1],marker=markers[1])
 
     if ylabels != None:
         ax2.set_ylabel(ylabels[1])
