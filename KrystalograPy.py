@@ -97,45 +97,197 @@ def GetAtomNameVDW(n):
             return(key)
 
 
-def VDW_range_search(atom,structure):
+def within(a,b,num,how='percent'):
+    """
+    Check if a is close to b. The acceptance range is defined by 'num' variable.
+    There are three modes of comparison:
+        percent  - range is definied by 'num'% of a. (for 10%, num = 0.1 etc)
+        round    - a and b are rounded to 'num' decimal places and compared.
+        constant - Difference between a and b must be less than 'num'.
+    
+    If a and b are list|tuple, each 1nth values will be compared (a[n] with b[n] etc.)
+    
+    Parameters
+    ----------
+    a : int|float
+        1st number.
+    b : int|float
+        2nd number.
+    num : int|float
+        Comparing variable.
+    how : str
+        Comparing method: percent, round, constant.
+    Returns
+    -------
+    Bool
+
+    """
+    iswithin = False
+    
+    assert type(a) in (int,float,tuple,list), "Type of A must be in int, float, tuple or list"
+    assert type(b) in (int,float,tuple,list), "Type of B must be in int, float, tuple or list"
+    assert how in ('percent','round','constant'), "How must be one of the follwing: percent, round, constant"
+    
+    if type(a) in (int,float) and type(b) in (int,float):
+    
+        if how == 'percent':
+            if (b <= a*(1+num)) and (b >= a*(1-num)):
+                iswithin = True
+        elif how == 'round':
+            if round(a,num) == round(b,num):
+                iswithin = True
+        elif how == 'constant':
+            if abs(a-b) < num:
+                iswithin = True
+    
+    elif type(a) in (list,tuple) and type(b) in (list,tuple):
+        
+        assert len(a) == len(b), "Size of the elements must be the same!"
+        if how == 'percent':
+            iswithin = all((b[n] <= a[n]*(1+num)) and (b[n] >= a[n]*(1-num)) for n in range(0,len(a)))
+        elif how == 'round':
+            iswithin = all(round(a[n],num) == round(b[n],num) for n in range(0,len(a)))
+        elif how == 'constant':
+            iswithin = all(abs(a[n]-b[n]) < num for n in range(0,len(a)))
+    
+    #Add functionality of mixed types
+            
+    return iswithin
+
+
+def VDW_atom_search(atom,Cell,UnitCell):
     ###The purpose is to search for atoms which are within VDW radius.
+    
+    #1) Build unit cells surrounding this one.
+    #2) Generate distances to each and every atom
+    #3) Use WdV table to get distance.
+    #4) Select only atoms which are below WvD
+    
+    #Cell == Cell_000 - this is the middle cell.
+    #Cell_001 means that all atoms are +1 in 00L direction.
+    
+    
     return None
 
 
-def BuildCell(atoms,codes_of_symmetry):
-    ###The purpose is to build content of the unit cell   
-    return None
+def BuildCell(atoms,codes_of_symmetry,acc=6):
+    """
+    Builds content of the unit cell.
+    :param atoms: list, extracted atoms cartesian
+    :param codes_of_symmetry: list, extracted from CIF
+    :param acc: accuracy of rounding for duplicate check.
+    :returns: list, all atoms in single unit cell
+    """
+
+    Cell = []
+    
+    for a in atoms:    
+        temp = []
+        x, y, z = a[2], a[3], a[4]
+        
+        #Transform for all symmetries and then compare positions.
+        #If too close, then discard
+        
+        for s in codes_of_symmetry:   
+            x, y, z = a[2], a[3], a[4]
+            c1 = eval(codes_of_symmetry[s][0]) 
+            c2 = eval(codes_of_symmetry[s][1])
+            c3 = eval(codes_of_symmetry[s][2])
+            
+            cal = [(a[0]+"_"+str(s)),a[1],c1,c2,c3,s]
+            
+            #Temporary list of symmetrical atoms
+            temp.append(cal)
+        
+        #Check if there are duplicates within accuracy
+        pop = []
+        for i in range(0,len(temp)):
+                for j in range(i+1,len(temp)):
+                    if within(temp[i][2:5],temp[j][2:5],acc,'round') == True:
+                        pop.append(j)
+        
+        #List of indices to be removed from temp
+        pop = list(set(pop))
+        pop.sort(reverse=True)
+
+        for i in pop:
+            temp.pop(i)
+        Cell += temp            
+           
+    return Cell
 
 
-def LoadCif(Path):
+def LoadCif(Path,Q_peak_remove=True):
     #TODO
-    ###Read ALL useful information from CIF:
-        #1)Atomic positions
-        #2)Unit cell parameters
-        #3)Symmetry codes
-        #4)Quality information
-        #5)FCF?
+    #UPDATE DESCRIPTION
+    """
+    Reads CIF file and extracts unit cell info, symmetry operations, atom list,
+    quality information, ect...
+    :param Path: str, Path to CIF file
+    :returns: symetry operators, atom list, parameter dictionary
+    """
         
-        from re import match
+    from re import match, findall
         
-        #Seek atoms
-        content = []
-        line_count = 0
-        START = 0
-        STOP = 0
-        atoms = []
+    que_sym = r"\'(\s?\-?[xyzXYZ\+\-\d\/]+)\,\s?(\s?\-?[xyzXYZ\+\-\d\/]+)\,\s?(\s?\-?[xyzXYZ\+\-\d\/]+)\'"
+    que_atm = r"(\w+\d?\w?)\s+(\d+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)"
+    
+    pars = {"_cell_length_a":None,"_cell_length_b":None,
+            "_cell_length_c":None,"_cell_angle_alpha":None,
+            "_cell_angle_beta":None,"_cell_angle_gamma":None,
+            "_cell_volume":None,"_cell_formula_units_Z":None,
+            "_diffrn_reflns_av_R_equivalents":None,
+            "_refine_ls_goodness_of_fit_ref":None,
+            "_refine_ls_R_factor_all":None,
+            "_refine_ls_R_factor_gt":None,"_refine_ls_wR_factor_gt":None,
+            "_refine_ls_wR_factor_ref":None}
+        
+    #content = []
+    
+    symops = {}
+    atoms = []
+    symsearch, atmsearch, s = 0, 0, 0
 
-        #Put all content to variables and mark start-stop positions 
-        with open(Path,'r') as f:
-            for line in f:
-                #if "FVAR" in str(line).upper():
-                #    START = line_count
-                #elif "HKLF 4" in str(line).upper() and STOP == 0:
-                #    STOP = line_count
-                content.append(line)
-                line_count += 1
-        
-        return None
+    with open(Path,'r') as f:
+        for line in f:
+
+            if symsearch == 1:
+                M = findall(que_sym,line)
+                if len(M) != 0:
+                    s+=1
+                    symops['$'+str(s)] = ([M[0][0],M[0][1],M[0][2]])
+                else:
+                    symsearch = 0
+            elif "_space_group_symop_operation_xyz" in str(line).lower():
+                symsearch = 1
+            elif atmsearch == 1:
+                M = match(que_atm,line)
+                if M:
+                    if (Q_peak_remove == True) and ("Q" not in M[1]):
+                        atoms.append([M[1],int(M[2]),float(M[3]),float(M[4]),
+                                      float(M[5])])
+                    elif Q_peak_remove == False:
+                        atoms.append([M[1],int(M[2]),float(M[3]),float(M[4]),
+                                      float(M[5])])
+                elif "HKLF 4" in str(line).upper():
+                    atmsearch == 0
+            elif "FVAR" in str(line).upper():
+                atmsearch = 1
+            elif "_space_group_name_H-M_alt" in str(line):
+                #This is not numeric value so different query is needed
+                #If I need more non-numerics in future, I'll make separate par.
+                L = findall(r"\s+\'(.+)\'",line)
+            elif any(x in line for x in pars.keys()):
+                M = findall(r"\s+([\d\.\(\)]+)",line)
+                if len(M) !=0:
+                    pars[str(line).split(" ")[0]] = M[0]
+
+    pars["_space_group_name_H-M_alt"] = L[0]
+            #This is for troubleshooting only
+            #content.append(line)
+    #return symops, atoms, par, content
+    
+    return symops,atoms, pars 
 
 
 def Cartesian(coordinates,unit_cell):
@@ -148,7 +300,6 @@ def Cartesian(coordinates,unit_cell):
     
     :return: ndarray, Cartesian coordinates.
     """
-    
     from numpy import cos, sin, sqrt, pi, array
 
     #If input is tuple, convert
@@ -293,6 +444,30 @@ def StructureCartesian(data,UnitCell):
    
     return CartesianAtoms
 
+
+def ProcessCrystal(Path,Silent=True):
+
+    #This is a full automatic processing of CIF file.
+    #Processing steps:
+        #1)Read CIF                           OK
+        #2)Translate Atoms to Cartesian       OK
+        #3)Build UnitCell class               OK
+        #4)Construct full cell                OK
+        #5)Prepare report of interactions     XX
+    if Silent == False: print('Loading CIF file')
+    Symm, Atom, Param = LoadCif(Path)
+    UC = UnitCell(list(map(float,list(Param.values())[0:6])), list(Param.values())[-1])
+    
+    if Silent == False: print('Calculate to cartesian')
+    AtomC = StructureCartesian(Atom, UC)
+    
+    if Silent == False: print('Build Unit Cell')
+    Cell = BuildCell(AtomC, Symm)    
+
+    return None
+
+
+#=============================================================================#
 
 def OMITME(maximal=999,minimal=0,r='high',error=10.0):
     
