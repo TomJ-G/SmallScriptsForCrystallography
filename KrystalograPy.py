@@ -1,19 +1,27 @@
 """
 Author: Tomasz Galica
-Last updated: 01.07.2022
+Last updated: 26.08.2022
 """
+
+#Maybe everything should be first calculated in Crystal coordinates and then
+#recalculated to cartesian only for display...
+
 #VandDerWaals radii dict.
 #This is not finished, some atoms are missing.
-VanDerWaals = {"H":[1.2,1], "Zn":[1.39,30], "He":[1.4,2], "Cu":[1.4,29], 
-               "F":[1.47,9], "O":[1.52,8], "Ne":[1.54,10], "N":[1.55,7], 
-               "Hg":[1.55,80], "Cd":[1.58,48], "Ni":[1.63,28], "Pd":[1.63,46],
-               "Au":[1.66,79], "C":[1.7,6], "Ag":[1.72,47], "Mg":[1.73,12], 
-               "Cl":[1.75,17], "Pt":[1.75,78], "P":[1.8,15], "S":[1.8,16], 
-               "Li":[1.82,3], "As":[1.85,33], "Br":[1.85,35], "U":[1.86,92], 
-               "Ga":[1.87,31], "Ar":[1.88,18], "Se":[1.9,34], "In":[1.93,49], 
-               "Tl":[1.96,81], "I":[1.98,53], "Kr":[2.02,36], "Pb":[2.02,82], 
-               "Te":[2.06,52], "Si":[2.10,14], "Xe":[2.16,54], "Sn":[2.17,50], 
-               "Na":[2.27,11], "K":[2.75,19], }
+VanDerWaals = {"H":[1.2,1],   "Zn":[1.39,30],  "He":[1.4,2],   "Cu":[1.4,29], 
+               "F":[1.47,9],  "O":[1.52,8],    "Be":[1.53,4],  "Ne":[1.54,10],  
+               "N":[1.55,7],  "Hg":[1.55,80],  "Cd":[1.58,48], "Ni":[1.63,28], 
+               "Pd":[1.63,46],"Au":[1.66,79],  "C":[1.7,6],    "Ag":[1.72,47],  
+               "Mg":[1.73,12],"Cl":[1.75,17],  "Pt":[1.75,78], "P":[1.8,15],  
+               "S":[1.8,16],  "Li":[1.82,3],   "Al":[1.84,13], "As":[1.85,33],  
+               "Br":[1.85,35],"U":[1.86,92],   "Ga":[1.87,31], "Ar":[1.88,18],  
+               "Se":[1.9,34], "B":[1.92,5],    "In":[1.93,49], "Tl":[1.96,81],  
+               "Po":[1.97,84],"I":[1.98,53],   "At":[2.02,85], "Kr":[2.02,36], 
+               "Pb":[2.02,82],"Sb":[2.06,51],  "Te":[2.06,52], "Bi":[2.07,83],  
+               "Si":[2.10,14],"Ge":[2.11,32],  "Sc":[2.11,21], "Xe":[2.16,54], 
+               "Sn":[2.17,50],"Rn":[2.20,86],  "Na":[2.27,11], "Ca":[2.31,20], 
+               "Sr":[2.49,38],"Ba":[2.68,56],  "K":[2.75,19],  "Ra":[2.83,88],
+               "Rb":[3.03,37],"Cs":[3.43,55],  "Fr":[3.48,87]}
 
 def ArrayWIndex(Dataframe):
     """
@@ -95,7 +103,15 @@ def GetAtomNameVDW(n):
     for key,value in VanDerWaals.items():
         if value[1]==n:
             return(key)
-
+        
+def GetVDWradius(n):
+    """
+    Based on atom name, returns Van der Waals radius.
+    :parameter n: str, Atom type
+    :return: float, Van der Waals radius
+    """
+    return(VanDerWaals[n][0])
+    
 
 def within(a,b,num,how='percent'):
     """
@@ -155,21 +171,6 @@ def within(a,b,num,how='percent'):
     return iswithin
 
 
-def VDW_atom_search(atom,Cell,UnitCell):
-    ###The purpose is to search for atoms which are within VDW radius.
-    
-    #1) Build unit cells surrounding this one.
-    #2) Generate distances to each and every atom
-    #3) Use WdV table to get distance.
-    #4) Select only atoms which are below WvD
-    
-    #Cell == Cell_000 - this is the middle cell.
-    #Cell_001 means that all atoms are +1 in 00L direction.
-    
-    
-    return None
-
-
 def BuildCell(atoms,codes_of_symmetry,acc=6):
     """
     Builds content of the unit cell.
@@ -220,6 +221,8 @@ def BuildCell(atoms,codes_of_symmetry,acc=6):
 def LoadCif(Path,Q_peak_remove=True):
     #TODO
     #UPDATE DESCRIPTION
+    #TODO
+    #LOAD SFAC!!!
     """
     Reads CIF file and extracts unit cell info, symmetry operations, atom list,
     quality information, ect...
@@ -277,12 +280,15 @@ def LoadCif(Path,Q_peak_remove=True):
                 #This is not numeric value so different query is needed
                 #If I need more non-numerics in future, I'll make separate par.
                 L = findall(r"\s+\'(.+)\'",line)
+            elif "SFAC" in str(line):
+                L2 = findall(r"\s+(.+)",line)
             elif any(x in line for x in pars.keys()):
                 M = findall(r"\s+([\d\.\(\)]+)",line)
                 if len(M) !=0:
                     pars[str(line).split(" ")[0]] = M[0]
 
     pars["_space_group_name_H-M_alt"] = L[0]
+    pars["SFAC"] = L2[0]
             #This is for troubleshooting only
             #content.append(line)
     #return symops, atoms, par, content
@@ -439,8 +445,8 @@ def StructureCartesian(data,UnitCell):
         Atoms = ExtractAtoms(data)
         
     for i in Atoms:
-        a = Cartesian(i[2:],UnitCell)
-        CartesianAtoms.append([i[0],i[1],*a])
+        a = Cartesian(i[2:5],UnitCell)
+        CartesianAtoms.append([i[0],i[1],*a,*i[5:6]])
    
     return CartesianAtoms
 
@@ -464,6 +470,68 @@ def ProcessCrystal(Path,Silent=True):
     if Silent == False: print('Build Unit Cell')
     Cell = BuildCell(AtomC, Symm)    
 
+    return(Symm,Atom,Param,UC,Cell)
+
+
+def SFACtranslate(value,SFAC):
+    """
+    Translates number to atom type or atom type to number.
+    """
+    sf = SFAC.split()    
+    if str(value).isalpha():
+        n = [i+1 for i in range(len(sf)) if value == sf[i]][0]
+    else:
+        n = [sf[i] for i in range(len(sf)) if value == i+1][0]
+    
+    return(n)
+        
+
+#Search funcs should use data from ProcessCrystal
+def VDW_atom_search(atom,atoms,UnitCell,Symm,SFAC=None):
+    ###The purpose is to search for atoms which are within VDW radius.
+    
+    #1) Build unit cells surrounding this one.
+        
+    #We shouldn't rely on name of atom as it can be for example Al1B, AL_1 ect.
+    #But I can use SFACtranslate, but also I can try this:
+        
+    nam = ''
+    for i in atom[0]:
+        if i.isalpha():
+            if len(nam)==0:
+                nam+=i.upper()
+            else:
+                nam+=i.lower()
+        else:
+            break
+    
+    WDVdist = GetVDWradius(nam)
+    VDW_bond_list =[]
+
+    Cells = [(x,y,z) for x in (-1,0,1) for y in (-1,0,1) for z in (-1,0,1)]
+    for cl in Cells:
+        #This produces shifted atomic coordinates
+        #Temp. list of atoms
+        ta = [[a[n] if n not in (2,3,4) else a[n]+cl[n-2] for n in range(len(a))] for a in atoms]
+        #Temp cartesian atoms
+        tac = StructureCartesian(ta,UnitCell)
+        #Temp Cell
+        tc = BuildCell(tac,Symm)
+        for tmp_atm in tc:
+            if BondDist(atom, tmp_atm[2:5],UnitCell) <= WDVdist:
+                VDW_bond_list.append(tmp_atm)
+    
+    #IF a in (2,4,5) then add
+    
+    
+    #2) Generate distances to each and every atom
+    #3) Use WdV table to get distance.
+    #4) Select only atoms which are below WvD
+    
+    #Cell == Cell_000 - this is the middle cell.
+    #Cell_001 means that all atoms are +1 in 00L direction.
+    
+    
     return None
 
 
