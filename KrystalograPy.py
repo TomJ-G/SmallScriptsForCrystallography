@@ -1,6 +1,6 @@
 """
 Author: Tomasz Galica
-Last updated: 26.08.2022
+Last updated: 24.01.2023
 """
 
 #Maybe everything should be first calculated in Crystal coordinates and then
@@ -51,25 +51,6 @@ def ArrayWIndex(Dataframe):
     
     return new_array
 
-def popsmall(data):
-    """
-    Remove the smallest element from the list.
-    :parameter data: list, list of numerical values
-    :returns: list
-    """
-    from numpy import inf 
-    small = inf
-    n = 0
-    index = 0
-    
-    for l in data:
-        if l < small:
-            small = l
-            index = n
-        n+=1
-    data.pop(index)
-    #data.sort()
-    return(data,index)
 
 def popouter(data,value):
     """
@@ -90,7 +71,6 @@ def popouter(data,value):
             index = n
         n+=1
     data.pop(index)
-    #data.sort()
     return(data,index)
 
 
@@ -221,7 +201,6 @@ def BuildCell(atoms,codes_of_symmetry,acc=6):
 def LoadCif(Path,Q_peak_remove=True):
     #TODO
     #UPDATE DESCRIPTION
-    #TODO
     #LOAD SFAC!!!
     """
     Reads CIF file and extracts unit cell info, symmetry operations, atom list,
@@ -415,7 +394,7 @@ def ExtractAtoms(Path):
             line_count += 1
 
     #Extract atomic information to list
-    #I do not care for displacement parameters at this moment
+    #No need to care for displacement parameters at this step
     query = r"(\w+\d?\w?)\s+(\d+)\s+(\d+\.?\d*)\s+(\d+\.?\d*)\s+(\d+\.?\d*)"
     for i in content[START+1:STOP]:
         M = match(query,i)
@@ -459,7 +438,7 @@ def ProcessCrystal(Path,Silent=True):
         #2)Translate Atoms to Cartesian       OK
         #3)Build UnitCell class               OK
         #4)Construct full cell                OK
-        #5)Prepare report of interactions     XX
+        #5)Prepare report of interactions     TODO
     if Silent == False: print('Loading CIF file')
     Symm, Atom, Param = LoadCif(Path)
     UC = UnitCell(list(map(float,list(Param.values())[0:6])), list(Param.values())[-1])
@@ -488,12 +467,12 @@ def SFACtranslate(value,SFAC):
 
 #Search funcs should use data from ProcessCrystal
 def VDW_atom_search(atom,atoms,UnitCell,Symm,SFAC=None):
+    ### NOT-FINISHED !!!
     ###The purpose is to search for atoms which are within VDW radius.
     
     #1) Build unit cells surrounding this one.
         
-    #We shouldn't rely on name of atom as it can be for example Al1B, AL_1 ect.
-    #But I can use SFACtranslate, but also I can try this:
+    #Not sure yet if I should use atom name or is it better to rely on SFAC.
         
     nam = ''
     for i in atom[0]:
@@ -518,9 +497,10 @@ def VDW_atom_search(atom,atoms,UnitCell,Symm,SFAC=None):
         #Temp Cell
         tc = BuildCell(tac,Symm)
         for tmp_atm in tc:
-            if BondDist(atom, tmp_atm[2:5],UnitCell) <= WDVdist:
-                VDW_bond_list.append(tmp_atm)
-    
+        #    if BondDist(atom, tmp_atm[2:5],UnitCell) <= WDVdist:
+        #        VDW_bond_list.append(tmp_atm)
+            print(tmp_atm)
+    #Something above is causing errors.
     #IF a in (2,4,5) then add
     
     
@@ -529,10 +509,175 @@ def VDW_atom_search(atom,atoms,UnitCell,Symm,SFAC=None):
     #4) Select only atoms which are below WvD
     
     #Cell == Cell_000 - this is the middle cell.
-    #Cell_001 means that all atoms are +1 in 00L direction.
-    
+    #Cell_001 means that all atoms are +1 in 00L direction.  
     
     return None
+
+
+
+#=============UTILITIES MOVED FROM MY OLD MODULE "FRAME UTILITY"==============#
+def equivalents(HKL,equivalents):
+    """
+    Produces list of symmetrically equivalent reflections.
+    Parameters:
+        HKL - a single hkl in list form: [h,k,l]
+        equivalents - list of rules for equivalents. Example:
+            [['h', 'k', 'l'],
+            ['l', 'h', 'k'],
+            ['k', 'l', 'h'],...]
+    Output:
+        ehkl - list of ALL equivalents including the original reflection
+    """
+    h,k,l = HKL[0],HKL[1],HKL[2]
+    ehkl = []
+    for eq in equivalents:
+        eh,ek,el = eval(eq[0]),eval(eq[1]),eval(eq[2])
+        if([eh,ek,el] in ehkl) == False:
+            ehkl.append([eh,ek,el])
+    return ehkl
+
+
+def list_files(root_folder,ftype,Silent=True,deep=True):
+    """
+    Creates list of files of selected format in the directory.
+    Parameters:
+        FPATH  - absolute path to the folder with diffraction frames files.
+        ftype  - Extension of file (e.g. 'tif','h5'...)
+        Silent - True by default. If set to False, prints information on number of found frames.
+        deep   - True by default - check folder and ALL subfolders. If False will only check in FPATH 
+    """
+    from pathlib import Path
+    if Silent == False:
+        print("Reading",ftype,"files...")
+    if deep == True:
+        Read_folder = Path(root_folder).rglob('*.'+str(ftype))
+    elif deep == False:
+        Read_folder = Path(root_folder).glob('*.'+str(ftype))
+    Files = [x for x in Read_folder]
+    if Silent == False:
+        print(len(Files),"frames found!")
+    return Files
+
+
+def centering_absence_check(latt_type,h,k,l):
+    """
+    Checks if the reflection is allowed by centering rules.
+    Parameters:
+        latt_type - Type of lattice centering. 
+                    Allowed values: "P","A","B","C","H","I","Ro","Rr","F".
+        h, k, l   - hkl coordinates of reflection.
+    Output:
+        exit_code - Code 1 means that the reflection is allowed, 
+                    0 that the reflection is forbidden, 
+                    99 means error.
+    """
+    
+    L_types = ["P","A","B","C","H","I","Ro","Rr","F"]    
+    exit_code = 99
+    if latt_type == 'P':
+        exit_code = 1
+    elif latt_type == 'A':
+        if (k+l)%2 == 0:
+            exit_code = 1
+        else:
+            exit_code = 0
+    elif latt_type == 'B':
+        if (h+l)%2 == 0:
+            exit_code = 1
+        else:
+            exit_code = 0
+    elif latt_type == 'C':
+        if (h+k)%2 == 0:
+            exit_code = 1
+        else:
+            exit_code = 0
+    elif latt_type == 'H':
+        if (h-k)%3 == 0:
+            exit_code = 1
+        else:
+            exit_code = 0
+    elif latt_type == 'I':
+        if (h+k+l)%2 == 0:
+            exit_code = 1
+        else:
+            exit_code = 0            
+    elif latt_type == 'Ro':
+        if (-h+k+l)%3 == 0:
+            exit_code = 1
+        else:
+            exit_code = 0 
+    elif latt_type == 'Rr':
+        if (h-k+l)%3 == 0:
+            exit_code = 1
+        else:
+            exit_code = 0
+    elif latt_type == 'F':
+        if (((h%2 == 0) and (k%2 == 0) and (l%2 == 0)) or ((h%2 == 1) and (k%2 == 1) and (l%2 == 1))):
+            exit_code = 1
+        else:
+            exit_code = 0
+    else:
+        print("Allowed lattice types: ",L_types)
+        exit_code = 99
+        raise Exception("WARNING! Lattice type not recognized!!!")
+    return(exit_code)
+
+
+def zs_absence_check(rules,h,k,l):
+    """
+    Checks zonal and serial reflection rules.
+    Parameters:
+        rules - The list of zonal/serial rules. The format is as follows:
+        
+                rule = [[[contributing hkl1],[rule1,%a]],
+                       [[contributing hkl2],[rule2,%b]],...]
+                
+                For example if the rule is that for h00 reflections the h = 2n it would be:
+                rule = [[[h00],[h,2]]]
+                
+                Example for one of the most popular space groups P21/c SG (#14):
+                rules = [
+                        [['h',0,'l'],['l',2]],
+                        [[0,'k',0],['k',2]],
+                        [[0,0,'l'],['l',2]]]
+                
+                Another example for R-3c SG (#167):
+                rules = [
+                        [['h','k','l'],['-h+k+l',3]],
+                        [['h','k','0'],['-h+k',3]],
+                        [['0','0','l'],['l',6]],
+                        [['h','-h','l'],['h+l',3]],
+                        [['h','-h','0'],['h',3]]]
+                
+        h, k, l - hkl coordinates of reflection.
+    Output:
+        exit_code - Code 1 means that the reflection is allowed, 0 that the reflection is forbidden.
+        
+    WARNING!!! This function uses eval expression. Be careful with the input.
+    """
+    apply = 0
+    exit_code = 0
+    
+    #First check if reflection apply to rule
+    for rule in rules:
+        th = eval(rule[0][0])
+        tk = eval(rule[0][1])
+        tl = eval(rule[0][2])
+        
+        #Only if the rule apply, check it
+        if ((th==0 and h==0)or(th!=0 and h!=0))and((tk==0 and k==0)or(tk!=0 and k!=0))and((tl==0 and l==0)or(tl!=0 and l!=0)):
+            #Second check for switched indices positions. Probably can be simplyfied to one if. maybe only 2nd one...
+            if(th==h)and(tk==k)and(tl==l):
+                apply = 1
+                if eval(rule[1][0])%rule[1][1]==0:
+                    exit_code = 1
+                else:
+                    exit_code = 0
+                
+    #If none of the rules applied, then reflection is OK
+    if apply == 0:
+        exit_code = 1
+    return exit_code
 
 
 #=============================================================================#
@@ -959,8 +1104,8 @@ def fcfoplot(Pth,LowerLimit,UpperLimit,log=True,
     fcfq = r"(\s*-?\d\s+-?\d\s+-?\d\s+)(\d+\.\d*\s+)(\d+\.\d*\s+)(\d+\.\d*\s+)"
     
     assert type(Pth) == list,"Please put path as a list! (Yes, even single item)"
-    assert type(LowerLimit) in (int,float,list,tuple),"Unrecognized fromat detected for variable: LowerLimit."
-    assert type(UpperLimit) in (int,float,list,tuple),"Unrecognized fromat detected for variable: UpperLimit."
+    assert type(LowerLimit) in (int,float,list,tuple),"Unrecognized format detected for variable: LowerLimit."
+    assert type(UpperLimit) in (int,float,list,tuple),"Unrecognized format detected for variable: UpperLimit."
     
     if type(LowerLimit) in (int,float):
         LLx = LowerLimit
