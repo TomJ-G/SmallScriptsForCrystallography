@@ -817,6 +817,78 @@ def MakeDF(data,columns,Index,Kelvin=False,SavePath=None):
     return DF
 
 
+def Cif_compile(path):
+    """
+    Compiles multiple CIF files into a single one
+    Parameters: path - path to folder containing CIFs
+    """
+    import os
+    import datetime
+    files=[]
+    now=datetime.datetime.now()
+    now=str(now.microsecond)+".cif"
+    
+    #Reading all the CIF files in the directory
+    for file in os.listdir(path):
+        if file.endswith(".cif"):
+            print('Found file:',os.path.join(path,file),sep='\n')
+            files.append(os.path.join(path,file))
+    if len(files)!=0:
+
+    #Create a new file
+        f= open(now,'x+')
+        f.close()
+
+    #Appending files into new file
+        for file in files:
+            f= open(file,'rt')
+            content=f.read()
+            f.close()
+            f= open(now,"a+")
+            f.write(content)
+            f.write('\n#===END\n')
+            f.close()
+            content=''
+
+        print('All CIF files has been compiled')
+        print('Your CIF file is nammed: ',now)
+        
+    else:
+        print('No CIF files found')
+
+        
+def Cif_extract(path):
+    """
+    Splits CIF file to separate blocks
+    Params: path - path to CIF file
+    """
+    N=0
+    line=''
+    content=''    
+#Reading the CIF file in the directory until #===END
+    try:
+        with open(path,'rt') as f:
+            print('Reading CIF file...')
+            for line in f:
+                if '#===END' not in line:
+                    content=content+line
+                else:
+                    N=N+1
+                    new = open(str(N)+'_split.cif','a+')
+                    new.write(content)
+                    new.close()
+                    content=''
+                    print('Extracted datablock',N)
+        f.close()
+        if N!=0:
+            print('Your CIF has been split')
+        else:
+            print('This file seem to be empty')
+    except IOError:
+        print('Wrong name or file does not exist')
+
+
+
 def plotSplit(DF,columns,composition = "auto",color='b',size = [22,12],
               x_label = None,y_label=None,error_bars=False,
               units=None, y_limits=None,legend=False,font_size = 12):
